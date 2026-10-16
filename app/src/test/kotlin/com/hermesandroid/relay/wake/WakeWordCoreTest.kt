@@ -69,11 +69,18 @@ class WakeWordCoreTest {
     }
 
     @Test
-    fun completedKeyword_matchesNormalizedDefaultPhrase() {
-        assertTrue(WakeWordTuning.matchesConfiguredPhrase("HEY_HERMES"))
-        assertTrue(WakeWordTuning.matchesConfiguredPhrase("  Hey   Hermes "))
-        assertFalse(WakeWordTuning.matchesConfiguredPhrase("Hey Herpes"))
-        assertFalse(WakeWordTuning.matchesConfiguredPhrase(""))
+    fun completedKeyword_matchesConfiguredPhraseOnly() {
+        assertTrue(WakeWordTuning.matchesConfiguredPhrase("HEY_HERMES", "Hey Hermes"))
+        assertTrue(WakeWordTuning.matchesConfiguredPhrase("  Hey   Hermes ", "Hey Hermes"))
+        assertTrue(WakeWordTuning.matchesConfiguredPhrase("HEY_LUNA", "Hey Luna"))
+        assertTrue(WakeWordTuning.matchesConfiguredPhrase("hey_jarvis", "HEY JARVIS"))
+        assertTrue(WakeWordTuning.matchesConfiguredPhrase("HEY_ALFRED", "Hey Alfred"))
+        assertTrue(WakeWordTuning.matchesConfiguredPhrase("HEY_RELAY", "Hey Relay"))
+        // Other phrases must not activate the configured one.
+        assertFalse(WakeWordTuning.matchesConfiguredPhrase("HEY_HERMES", "Hey Luna"))
+        assertFalse(WakeWordTuning.matchesConfiguredPhrase("HEY_JARVIS", "Hey Alfred"))
+        assertFalse(WakeWordTuning.matchesConfiguredPhrase("Hey Herpes", "Hey Hermes"))
+        assertFalse(WakeWordTuning.matchesConfiguredPhrase("", "Hey Hermes"))
     }
 
     @Test

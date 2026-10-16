@@ -252,6 +252,13 @@ class VoiceSettingsViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    fun setWakeWordPhrase(phrase: String) {
+        viewModelScope.launch {
+            wakeWordRepo.setPhrase(phrase)
+            WakeWordForegroundService.reloadSettings()
+        }
+    }
+
     fun setWakeWordSensitivity(value: Float) {
         viewModelScope.launch {
             wakeWordRepo.setSensitivity(value)

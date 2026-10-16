@@ -168,6 +168,7 @@ class WakeWordForegroundService : Service() {
                     files = files,
                     sensitivity = preferences.sensitivity,
                     confirmationFrames = preferences.confirmationFrames,
+                    phrase = preferences.phrase,
                 )
                 unattachedDetector = createdDetector
                 val minBuffer = AudioRecord.getMinBufferSize(

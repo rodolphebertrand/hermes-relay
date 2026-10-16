@@ -149,6 +149,7 @@ import com.hermesandroid.relay.viewmodel.VoiceSettingsViewModel
 import com.hermesandroid.relay.viewmodel.VoiceViewModel
 import com.hermesandroid.relay.viewmodel.VoiceState
 import com.hermesandroid.relay.viewmodel.VoicePreviewUiState
+import com.hermesandroid.relay.wake.WakeWordPhrases
 import com.hermesandroid.relay.wake.WakeWordPreferences
 import com.hermesandroid.relay.wake.WakeWordRuntimeState
 import com.hermesandroid.relay.wake.WakeWordTestPhase
@@ -613,6 +614,7 @@ fun VoiceSettingsScreen(
                         error = wakeWordPermissionError ?: wakeWordInstallState.error,
                         onEnable = requestWakeWordEnable,
                         onDisable = { settingsViewModel.setWakeWordEnabled(false) },
+                        onPhraseChange = settingsViewModel::setWakeWordPhrase,
                         onSensitivityChange = settingsViewModel::setWakeWordSensitivity,
                         onConfirmationFramesChange =
                             settingsViewModel::setWakeWordConfirmationFrames,
@@ -3645,6 +3647,7 @@ private fun WakeWordCard(
     error: String?,
     onEnable: () -> Unit,
     onDisable: () -> Unit,
+    onPhraseChange: (String) -> Unit,
     onSensitivityChange: (Float) -> Unit,
     onConfirmationFramesChange: (Int) -> Unit,
     onStartNewSessionChange: (Boolean) -> Unit,
@@ -3719,10 +3722,15 @@ private fun WakeWordCard(
 
         if (preferences.enabled) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            ProviderRow(
+            VoiceChoiceDropdown(
                 label = stringResource(R.string.wake_word_phrase),
                 value = preferences.phrase,
+                choices = WakeWordPhrases.SUPPORTED.map {
+                    VoiceChoice(value = it.label, label = it.label)
+                },
+                onValueChange = onPhraseChange,
             )
+            Spacer(Modifier.height(8.dp))
             ProviderRow(
                 label = stringResource(R.string.wake_word_status),
                 value = when (runtimeState) {

@@ -179,6 +179,7 @@ class HermesVoiceInteractionService : VoiceInteractionService() {
                     files,
                     preferences.sensitivity,
                     preferences.confirmationFrames,
+                    phrase = preferences.phrase,
                 )
                 unattachedDetector = createdDetector
                 val minBuffer = AudioRecord.getMinBufferSize(

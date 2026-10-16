@@ -19,11 +19,14 @@ data class WakeWordModelFiles(
 )
 
 /**
- * Installs only the four runtime files needed by the fixed English phrase.
+ * Installs the runtime files for the supported wake phrases.
  *
- * Files come from the model repository linked by sherpa-onnx's official KWS
- * documentation. Every download is pinned by byte length and SHA-256 before
- * the install directory is promoted atomically.
+ * The model files come from the model repository linked by sherpa-onnx's
+ * official KWS documentation. Every download is pinned by byte length and
+ * SHA-256 before the install directory is promoted atomically. The keywords
+ * file is generated from the model's published SentencePiece vocabulary
+ * (see [WakeWordPhrases]); when only that file is stale, it is refreshed in
+ * place instead of re-downloading the model.
  */
 class WakeWordModelInstaller(
     context: Context,
@@ -36,6 +39,16 @@ class WakeWordModelInstaller(
         runCatching {
             installedFiles()?.let { return@runCatching it }
 
+            // Upgrade path: the pinned model is already on disk and only the
+            // generated keywords file is stale (phrase catalog changed).
+            // Refresh it in place instead of re-downloading the model.
+            if (modelArtifactsValid()) {
+                File(modelRoot, KEYWORDS_FILE)
+                    .writeText(WakeWordPhrases.KEYWORDS_CONTENT, Charsets.UTF_8)
+                installedFiles()
+                    ?: throw IOException("Wake-word keywords refresh failed verification")
+            }
+
             val staging = File(appContext.filesDir, "$MODEL_DIRECTORY.installing")
             staging.deleteRecursively()
             check(staging.mkdirs()) { "Could not create wake-word model directory" }
@@ -44,7 +57,8 @@ class WakeWordModelInstaller(
                 MODEL_ARTIFACTS.forEach { artifact ->
                     downloadVerified(artifact, File(staging, artifact.fileName))
                 }
-                File(staging, KEYWORDS_FILE).writeText(KEYWORDS_CONTENT, Charsets.UTF_8)
+                File(staging, KEYWORDS_FILE)
+                    .writeText(WakeWordPhrases.KEYWORDS_CONTENT, Charsets.UTF_8)
                 File(staging, INSTALL_MARKER).writeText(MODEL_VERSION, Charsets.UTF_8)
 
                 modelRoot.deleteRecursively()
@@ -70,7 +84,9 @@ class WakeWordModelInstaller(
             artifact.fileName to file
         }
         val keywords = File(modelRoot, KEYWORDS_FILE)
-        if (!keywords.isFile || keywords.readText(Charsets.UTF_8) != KEYWORDS_CONTENT) return null
+        if (!keywords.isFile || keywords.readText(Charsets.UTF_8) != WakeWordPhrases.KEYWORDS_CONTENT) {
+            return null
+        }
         return WakeWordModelFiles(
             directory = modelRoot,
             encoder = byName.getValue(ENCODER_FILE),
@@ -79,6 +95,21 @@ class WakeWordModelInstaller(
             tokens = byName.getValue(TOKENS_FILE),
             keywords = keywords,
         )
+    }
+
+    /**
+     * True when the pinned model files (marker + names + byte lengths) are
+     * intact on disk, regardless of the generated keywords file content.
+     * Used to refresh a stale keywords file without re-downloading the model.
+     */
+    fun modelArtifactsValid(): Boolean {
+        if (File(modelRoot, INSTALL_MARKER).takeIf { it.isFile }?.readText()?.trim() != MODEL_VERSION) {
+            return false
+        }
+        return MODEL_ARTIFACTS.all { artifact ->
+            val file = File(modelRoot, artifact.fileName)
+            file.isFile && file.length() == artifact.byteLength
+        }
     }
 
     private fun downloadVerified(artifact: ModelArtifact, destination: File) {
@@ -135,10 +166,6 @@ class WakeWordModelInstaller(
         const val DECODER_FILE = "decoder-epoch-12-avg-2-chunk-16-left-64.onnx"
         const val JOINER_FILE = "joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx"
         const val TOKENS_FILE = "tokens.txt"
-
-        // Generated with this model's published SentencePiece vocabulary.
-        // No arbitrary-phrase tokenizer is bundled in the first release.
-        const val KEYWORDS_CONTENT = "▁HE Y ▁HER ME S @HEY_HERMES\n"
 
         private val MODEL_ARTIFACTS = listOf(
             ModelArtifact(

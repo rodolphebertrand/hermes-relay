@@ -104,6 +104,27 @@ class WakeWordPreferencesTest {
     }
 
     @Test
+    fun phrase_roundTripsThroughCatalog() = runTest {
+        repository.setPhrase("Hey Luna")
+        val preferences = repository.flow.first()
+        assertEquals("Hey Luna", preferences.phrase)
+
+        repository.setPhrase("hey alfred")
+        assertEquals("Hey Alfred", repository.flow.first().phrase)
+
+        repository.setPhrase(WakeWordPhrases.DEFAULT.label)
+        assertEquals("Hey Hermes", repository.flow.first().phrase)
+    }
+
+    @Test
+    fun phrase_unknownOrMalformedValuesAreIgnored() = runTest {
+        repository.setPhrase("Hey Herpes")
+        repository.setPhrase("")
+        repository.setPhrase("  ")
+        assertEquals(WakeWordPhrases.DEFAULT.label, repository.flow.first().phrase)
+    }
+
+    @Test
     fun futureProfileRoutingShape_roundTripsWithoutEnablingIt() = runTest {
         repository.setProfileRouting(
             WakeWordProfileRouting(

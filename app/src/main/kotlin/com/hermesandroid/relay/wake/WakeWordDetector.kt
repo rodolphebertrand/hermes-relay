@@ -20,6 +20,7 @@ fun interface WakeWordDetectorFactory {
         files: WakeWordModelFiles,
         sensitivity: Float,
         confirmationFrames: Int,
+        phrase: String,
     ): WakeWordDetector
 }
 
@@ -34,18 +35,19 @@ object WakeWordTuning {
      */
     fun trailingBlanks(confirmationFrames: Int): Int = confirmationFrames.coerceIn(1, 5)
 
-    fun matchesConfiguredPhrase(keyword: String): Boolean =
+    fun matchesConfiguredPhrase(keyword: String, phrase: String): Boolean =
         keyword
             .replace('_', ' ')
             .trim()
             .replace(Regex("\\s+"), " ")
-            .equals(DEFAULT_WAKE_PHRASE, ignoreCase = true)
+            .equals(phrase, ignoreCase = true)
 }
 
 class SherpaWakeWordDetector(
     files: WakeWordModelFiles,
     sensitivity: Float,
     confirmationFrames: Int,
+    private val phrase: String = WakeWordPhrases.DEFAULT.label,
 ) : WakeWordDetector {
     private val spotter = KeywordSpotter(
         config = KeywordSpotterConfig(
@@ -83,7 +85,7 @@ class SherpaWakeWordDetector(
             spotter.decode(stream)
             val keyword = spotter.getResult(stream).keyword
             if (keyword.isNotBlank()) {
-                detected = WakeWordTuning.matchesConfiguredPhrase(keyword)
+                detected = WakeWordTuning.matchesConfiguredPhrase(keyword, phrase)
                 // sherpa's KWS contract requires reset immediately after any
                 // completed keyword result. Without it the completed result
                 // remains attached to the stream and later frames are stale.

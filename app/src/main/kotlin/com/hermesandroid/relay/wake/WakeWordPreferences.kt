@@ -90,9 +90,10 @@ class WakeWordPreferencesRepository(
             WakeWordPreferences(
                 enabled = prefs[KEY_ENABLED] ?: false,
                 assistantEnabled = prefs[KEY_ASSISTANT_ENABLED] ?: false,
-                // Only one phrase has been validated. Ignore stale/future values
-                // until the product actually exposes multi-phrase support.
-                phrase = DEFAULT_WAKE_PHRASE,
+                // Fall back to the default when the stored value is unknown
+                // (future phrase removed, stale data, or never set).
+                phrase = prefs[KEY_PHRASE]?.let(WakeWordPhrases::byLabel)?.label
+                    ?: WakeWordPhrases.DEFAULT.label,
                 sensitivity = (prefs[KEY_SENSITIVITY] ?: 0.3f).coerceIn(0.2f, 0.9f),
                 confirmationFrames = (prefs[KEY_CONFIRMATION_FRAMES] ?: 3).coerceIn(1, 5),
                 startNewSession = prefs[KEY_START_NEW_SESSION] ?: true,
@@ -112,7 +113,6 @@ class WakeWordPreferencesRepository(
                 val flags = flagsForWakeWordMode(WakeWordListenerMode.ForegroundService)
                 it[KEY_ENABLED] = flags.foregroundService
                 it[KEY_ASSISTANT_ENABLED] = flags.systemAssistant
-                it[KEY_PHRASE] = DEFAULT_WAKE_PHRASE
             } else {
                 it[KEY_ENABLED] = false
             }
@@ -125,11 +125,16 @@ class WakeWordPreferencesRepository(
                 val flags = flagsForWakeWordMode(WakeWordListenerMode.SystemAssistant)
                 it[KEY_ENABLED] = flags.foregroundService
                 it[KEY_ASSISTANT_ENABLED] = flags.systemAssistant
-                it[KEY_PHRASE] = DEFAULT_WAKE_PHRASE
             } else {
                 it[KEY_ASSISTANT_ENABLED] = false
             }
         }
+    }
+
+    /** Store a supported wake phrase; unknown labels are ignored. */
+    suspend fun setPhrase(label: String) {
+        val phrase = WakeWordPhrases.byLabel(label) ?: return
+        dataStore.edit { it[KEY_PHRASE] = phrase.label }
     }
 
     suspend fun setSensitivity(sensitivity: Float) {
@@ -157,7 +162,6 @@ class WakeWordPreferencesRepository(
             } else {
                 prefs[KEY_PROFILE_NAME] = profileName
             }
-            prefs[KEY_PHRASE] = DEFAULT_WAKE_PHRASE
         }
     }
 }
