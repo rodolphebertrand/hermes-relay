@@ -38,6 +38,8 @@ data class WakeWordProfileRouting(
 data class WakeWordPreferences(
     val enabled: Boolean = false,
     val assistantEnabled: Boolean = false,
+    /** Active inference backend (see [WakeWordBackend]). Defaults to openWakeWord. */
+    val backend: String = WakeWordBackend.DEFAULT.name,
     val phrase: String = DEFAULT_WAKE_PHRASE,
     /** Higher is stricter (fewer false activations), matching upstream. */
     val sensitivity: Float = 0.3f,
@@ -76,6 +78,7 @@ class WakeWordPreferencesRepository(
     private companion object {
         val KEY_ENABLED = booleanPreferencesKey("wake_word_enabled")
         val KEY_ASSISTANT_ENABLED = booleanPreferencesKey("assistant_wake_word_enabled")
+        val KEY_BACKEND = stringPreferencesKey("wake_word_backend")
         val KEY_PHRASE = stringPreferencesKey("wake_word_phrase")
         val KEY_SENSITIVITY = floatPreferencesKey("wake_word_sensitivity")
         val KEY_CONFIRMATION_FRAMES = intPreferencesKey("wake_word_confirmation_frames")
@@ -90,6 +93,9 @@ class WakeWordPreferencesRepository(
             WakeWordPreferences(
                 enabled = prefs[KEY_ENABLED] ?: false,
                 assistantEnabled = prefs[KEY_ASSISTANT_ENABLED] ?: false,
+                // Resolve the backend (fall back to the default for unknown values).
+                backend = prefs[KEY_BACKEND]?.let(WakeWordBackend::fromName)?.name
+                    ?: WakeWordBackend.DEFAULT.name,
                 // Fall back to the default when the stored value is unknown
                 // (future phrase removed, stale data, or never set).
                 phrase = prefs[KEY_PHRASE]?.let(WakeWordPhrases::byLabel)?.label
@@ -135,6 +141,11 @@ class WakeWordPreferencesRepository(
     suspend fun setPhrase(label: String) {
         val phrase = WakeWordPhrases.byLabel(label) ?: return
         dataStore.edit { it[KEY_PHRASE] = phrase.label }
+    }
+
+    /** Store the active backend (one of [WakeWordBackend]). */
+    suspend fun setBackend(backend: WakeWordBackend) {
+        dataStore.edit { it[KEY_BACKEND] = backend.name }
     }
 
     suspend fun setSensitivity(sensitivity: Float) {

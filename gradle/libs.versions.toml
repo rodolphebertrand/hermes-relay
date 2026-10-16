@@ -31,6 +31,7 @@ play-publisher = "4.1.1"
 media3 = "1.11.1"
 androidVad = "2.0.10"
 sherpaOnnx = "v1.13.4"
+tensorflowLite = "2.17.0"
 onnxRuntime = "1.27.0"
 play-app-update = "2.1.0"
 
@@ -102,6 +103,7 @@ media3-ui-compose = { group = "androidx.media3", name = "media3-ui-compose", ver
 # android-vad (Silero) — on-device voice activity detection for barge-in (B2)
 android-vad-silero = { group = "com.github.gkonovalov.android-vad", name = "silero", version.ref = "androidVad" }
 sherpa-onnx = { group = "com.github.k2-fsa", name = "sherpa-onnx", version.ref = "sherpaOnnx" }
+tensorflow-lite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tensorflowLite" }
 onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxRuntime" }
 
 # Google Play In-App Update — googlePlay flavor ONLY (FLEXIBLE flow).

@@ -9,6 +9,14 @@ data class WakeWordPhrase(
     val keywordsLine: String,
 )
 
+/** A trained openWakeWord classifier model for one phrase (Phase 1b registers the rest). */
+data class OpenWakeWordModelSpec(
+    val phrase: String,
+    val fileName: String,
+    val sha256: String,
+    val sizeBytes: Long,
+)
+
 /**
  * Phrases offered in Settings → Voice → Wake word.
  *
@@ -35,4 +43,26 @@ object WakeWordPhrases {
     /** Multi-line keywords file: one validated phrase per line. */
     val KEYWORDS_CONTENT: String =
         SUPPORTED.joinToString(separator = "\n") { it.keywordsLine } + "\n"
+
+    /**
+     * Trained openWakeWord classifier models. Phase 1a ships the reference "Hey Jarvis"
+     * model (the only pre-trained classifier in the v0.5.1 release that matches a target
+     * phrase). Phase 1b trains and registers the other four phrases here.
+     */
+    val OPENWAKEWORD_MODELS: List<OpenWakeWordModelSpec> = listOf(
+        OpenWakeWordModelSpec(
+            phrase = "Hey Jarvis",
+            fileName = "hey_jarvis_v0.1.tflite",
+            sha256 = "3080e178d59b2377f5d87180b69b3e63c599795f9b21b05400e203e5c4b01b7f",
+            sizeBytes = 1_302_548L,
+        ),
+    )
+
+    /** The trained openWakeWord model for a phrase label, or null when not yet trained. */
+    fun openWakeWordSpec(label: String): OpenWakeWordModelSpec? =
+        OPENWAKEWORD_MODELS.firstOrNull { it.phrase.equals(label.trim(), true) }
+
+    /** Phrases available on the openWakeWord backend (for the UI selector). */
+    val OPENWAKEWORD_AVAILABLE_LABELS: Set<String> =
+        OPENWAKEWORD_MODELS.map { it.phrase }.toSet()
 }

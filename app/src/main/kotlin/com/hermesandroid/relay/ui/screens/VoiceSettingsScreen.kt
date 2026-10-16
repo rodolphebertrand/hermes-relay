@@ -149,6 +149,7 @@ import com.hermesandroid.relay.viewmodel.VoiceSettingsViewModel
 import com.hermesandroid.relay.viewmodel.VoiceViewModel
 import com.hermesandroid.relay.viewmodel.VoiceState
 import com.hermesandroid.relay.viewmodel.VoicePreviewUiState
+import com.hermesandroid.relay.wake.WakeWordBackend
 import com.hermesandroid.relay.wake.WakeWordPhrases
 import com.hermesandroid.relay.wake.WakeWordPreferences
 import com.hermesandroid.relay.wake.WakeWordRuntimeState
@@ -615,6 +616,7 @@ fun VoiceSettingsScreen(
                         onEnable = requestWakeWordEnable,
                         onDisable = { settingsViewModel.setWakeWordEnabled(false) },
                         onPhraseChange = settingsViewModel::setWakeWordPhrase,
+                        onBackendChange = settingsViewModel::setWakeWordBackend,
                         onSensitivityChange = settingsViewModel::setWakeWordSensitivity,
                         onConfirmationFramesChange =
                             settingsViewModel::setWakeWordConfirmationFrames,
@@ -3648,6 +3650,7 @@ private fun WakeWordCard(
     onEnable: () -> Unit,
     onDisable: () -> Unit,
     onPhraseChange: (String) -> Unit,
+    onBackendChange: (WakeWordBackend) -> Unit,
     onSensitivityChange: (Float) -> Unit,
     onConfirmationFramesChange: (Int) -> Unit,
     onStartNewSessionChange: (Boolean) -> Unit,
@@ -3722,11 +3725,35 @@ private fun WakeWordCard(
 
         if (preferences.enabled) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            val isOpenWakeWord =
+                WakeWordBackend.fromName(preferences.backend) == WakeWordBackend.OPENWAKEWORD
+            VoiceChoiceDropdown(
+                label = stringResource(R.string.wake_word_backend),
+                value = preferences.backend,
+                choices = listOf(
+                    VoiceChoice(value = WakeWordBackend.SHERPA.name, label = "sherpa-onnx (KWS)"),
+                    VoiceChoice(
+                        value = WakeWordBackend.OPENWAKEWORD.name,
+                        label = "openWakeWord (TFLite)",
+                        detail = "Phase 1a: Hey Jarvis",
+                    ),
+                ),
+                onValueChange = { name ->
+                    onBackendChange(WakeWordBackend.fromName(name) ?: WakeWordBackend.DEFAULT)
+                },
+            )
+            Spacer(Modifier.height(8.dp))
             VoiceChoiceDropdown(
                 label = stringResource(R.string.wake_word_phrase),
                 value = preferences.phrase,
-                choices = WakeWordPhrases.SUPPORTED.map {
-                    VoiceChoice(value = it.label, label = it.label)
+                choices = if (isOpenWakeWord) {
+                    WakeWordPhrases.OPENWAKEWORD_MODELS.map {
+                        VoiceChoice(value = it.phrase, label = it.phrase)
+                    }
+                } else {
+                    WakeWordPhrases.SUPPORTED.map {
+                        VoiceChoice(value = it.label, label = it.label)
+                    }
                 },
                 onValueChange = onPhraseChange,
             )

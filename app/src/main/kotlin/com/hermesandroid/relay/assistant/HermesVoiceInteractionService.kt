@@ -17,7 +17,8 @@ import androidx.core.content.ContextCompat
 import com.hermesandroid.relay.wake.MicrophoneLease
 import com.hermesandroid.relay.wake.MicrophoneOwner
 import com.hermesandroid.relay.wake.MicrophoneOwnershipCoordinator
-import com.hermesandroid.relay.wake.SherpaWakeWordDetector
+import com.hermesandroid.relay.wake.WakeWordDetector
+import com.hermesandroid.relay.wake.WakeWordEngine
 import com.hermesandroid.relay.wake.WakeWordModelInstaller
 import com.hermesandroid.relay.wake.WakeWordPreferences
 import com.hermesandroid.relay.wake.WakeWordPreferencesRepository
@@ -53,7 +54,7 @@ class HermesVoiceInteractionService : VoiceInteractionService() {
     private var preferencesJob: Job? = null
     private var recognitionJob: Job? = null
     private var recorder: AudioRecord? = null
-    private var detector: SherpaWakeWordDetector? = null
+    private var detector: WakeWordDetector? = null
     private var microphoneLease: MicrophoneLease? = null
     @Volatile private var latestPreferences = WakeWordPreferences()
     @Volatile private var voiceSessionActive = false
@@ -157,11 +158,6 @@ class HermesVoiceInteractionService : VoiceInteractionService() {
             setRuntimeState(AssistantWakeRuntimeState.Error)
             return
         }
-        val files = WakeWordModelInstaller(this).installedFiles()
-        if (files == null) {
-            setRuntimeState(AssistantWakeRuntimeState.Error)
-            return
-        }
         val lease = MicrophoneOwnershipCoordinator.tryAcquire(MicrophoneOwner.WakeWord)
         if (lease == null) {
             setRuntimeState(AssistantWakeRuntimeState.PausedForVoice)
@@ -173,14 +169,13 @@ class HermesVoiceInteractionService : VoiceInteractionService() {
         setRuntimeState(AssistantWakeRuntimeState.Starting)
         recognitionJob = scope.launch {
             var detected = false
-            var unattachedDetector: SherpaWakeWordDetector? = null
+            var unattachedDetector: WakeWordDetector? = null
             try {
-                val createdDetector = SherpaWakeWordDetector(
-                    files,
-                    preferences.sensitivity,
-                    preferences.confirmationFrames,
-                    phrase = preferences.phrase,
-                )
+                val createdDetector = WakeWordEngine.createDetector(this, preferences)
+                    ?: run {
+                        setRuntimeState(AssistantWakeRuntimeState.Error)
+                        return@launch
+                    }
                 unattachedDetector = createdDetector
                 val minBuffer = AudioRecord.getMinBufferSize(
                     SAMPLE_RATE,

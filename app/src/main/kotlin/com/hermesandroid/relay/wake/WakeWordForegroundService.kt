@@ -147,11 +147,6 @@ class WakeWordForegroundService : Service() {
             fail("Microphone permission is required")
             return
         }
-        val files = WakeWordModelInstaller(this).installedFiles()
-        if (files == null) {
-            fail("Wake-word model is not installed")
-            return
-        }
         val lease = MicrophoneOwnershipCoordinator.tryAcquire(MicrophoneOwner.WakeWord)
         if (lease == null) {
             setRuntimeState(WakeWordRuntimeState.PausedForVoice)
@@ -164,12 +159,11 @@ class WakeWordForegroundService : Service() {
             var testDetection = false
             var unattachedDetector: WakeWordDetector? = null
             try {
-                val createdDetector = SherpaWakeWordDetector(
-                    files = files,
-                    sensitivity = preferences.sensitivity,
-                    confirmationFrames = preferences.confirmationFrames,
-                    phrase = preferences.phrase,
-                )
+                val createdDetector = WakeWordEngine.createDetector(this, preferences)
+                    ?: run {
+                        fail("Wake-word model is not installed for the selected backend/phrase")
+                        return@launch
+                    }
                 unattachedDetector = createdDetector
                 val minBuffer = AudioRecord.getMinBufferSize(
                     SAMPLE_RATE,

@@ -4309,6 +4309,7 @@
     <string name="wake_word_enable">Listen for “Hey Hermes”</string>
     <string name="wake_word_enable_desc">Experimental, opt-in detection that runs entirely on this phone.</string>
     <string name="wake_word_phrase">Phrase</string>
+    <string name="wake_word_backend">Engine</string>
     <string name="wake_word_status">Status</string>
     <string name="wake_word_status_stopped">Stopped</string>
     <string name="wake_word_status_starting">Starting…</string>

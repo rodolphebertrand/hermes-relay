@@ -15,8 +15,11 @@ import com.hermesandroid.relay.network.relay.VoiceConfig
 import com.hermesandroid.relay.network.relay.VoiceOutputConfig
 import com.hermesandroid.relay.util.HumanError
 import com.hermesandroid.relay.util.classifyError
+import com.hermesandroid.relay.wake.WakeWordBackend
+import com.hermesandroid.relay.wake.WakeWordEngine
 import com.hermesandroid.relay.wake.WakeWordForegroundService
 import com.hermesandroid.relay.wake.WakeWordModelInstaller
+import com.hermesandroid.relay.wake.WakeWordPhrases
 import com.hermesandroid.relay.wake.WakeWordPreferences
 import com.hermesandroid.relay.wake.WakeWordPreferencesRepository
 import com.hermesandroid.relay.wake.WakeWordRuntimeState
@@ -193,7 +196,8 @@ class VoiceSettingsViewModel(application: Application) : AndroidViewModel(applic
         if (_wakeWordInstallState.value.installing) return
         _wakeWordInstallState.value = WakeWordInstallUiState(installing = true)
         viewModelScope.launch {
-            val result = WakeWordModelInstaller(getApplication()).ensureInstalled()
+            val prefs = wakeWordRepo.flow.first()
+            val result = WakeWordEngine.ensureModels(getApplication(), prefs)
             result.fold(
                 onSuccess = {
                     runCatching {
@@ -227,7 +231,8 @@ class VoiceSettingsViewModel(application: Application) : AndroidViewModel(applic
         if (_wakeWordInstallState.value.installing) return
         _wakeWordInstallState.value = WakeWordInstallUiState(installing = true)
         viewModelScope.launch {
-            val result = WakeWordModelInstaller(getApplication()).ensureInstalled()
+            val prefs = wakeWordRepo.flow.first()
+            val result = WakeWordEngine.ensureModels(getApplication(), prefs)
             result.fold(
                 onSuccess = {
                     runCatching {
@@ -255,6 +260,25 @@ class VoiceSettingsViewModel(application: Application) : AndroidViewModel(applic
     fun setWakeWordPhrase(phrase: String) {
         viewModelScope.launch {
             wakeWordRepo.setPhrase(phrase)
+            WakeWordForegroundService.reloadSettings()
+        }
+    }
+
+    /**
+     * Switch the inference backend. When switching to openWakeWord, the current phrase
+     * may have no trained classifier yet (Phase 1a ships "Hey Jarvis"); fall back to the
+     * first available phrase for that backend so the listener can still start.
+     */
+    fun setWakeWordBackend(backend: WakeWordBackend) {
+        viewModelScope.launch {
+            wakeWordRepo.setBackend(backend)
+            val prefs = wakeWordRepo.flow.first()
+            if (backend == WakeWordBackend.OPENWAKEWORD &&
+                WakeWordPhrases.openWakeWordSpec(prefs.phrase) == null
+            ) {
+                val fallback = WakeWordPhrases.OPENWAKEWORD_MODELS.first().phrase
+                wakeWordRepo.setPhrase(fallback)
+            }
             WakeWordForegroundService.reloadSettings()
         }
     }

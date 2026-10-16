@@ -383,6 +383,8 @@ dependencies {
     // Keep the shared runtime aligned with sherpa-onnx v1.13.4.
     implementation(libs.onnxruntime.android)
     implementation(libs.sherpa.onnx)
+    // openWakeWord TFLite pipeline (Phase 1a) — melspectrogram → embedding → wake word.
+    implementation(libs.tensorflow.lite)
 
     // Google Play In-App Update — googlePlay flavor ONLY (FLEXIBLE flow).
     // Scoped via the `googlePlayImplementation` configuration so it never
