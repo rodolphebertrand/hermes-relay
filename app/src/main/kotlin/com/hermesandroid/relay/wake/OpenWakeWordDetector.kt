@@ -2,7 +2,6 @@ package com.hermesandroid.relay.wake
 
 import android.util.Log
 import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.TensorFlowLiteModel
 
 /**
  * openWakeWord TFLite wake-word detector ([WakeWordDetector] implementation).
@@ -38,21 +37,24 @@ class OpenWakeWordDetector(
         // delegate can be layered on later as a measured optimization.
     }
 
-    private val melspec =
-        Interpreter(TensorFlowLiteModel.load(files.melspectrogram.absolutePath), options)
-    private val embedding =
-        Interpreter(TensorFlowLiteModel.load(files.embedding.absolutePath), options)
-    private val wakeWord =
-        Interpreter(TensorFlowLiteModel.load(files.wakeWord.absolutePath), options)
+    private val melspec = Interpreter(files.melspectrogram, options)
+    private val embedding = Interpreter(files.embedding, options)
+    private val wakeWord = Interpreter(files.wakeWord, options)
+
+    // Output buffers, sized against the actual (post-resize) tensor shapes.
+    private var melOut = FloatArray(0)
+    private val embOut = FloatArray(EMBED_DIM)
+    private val wakeOut = FloatArray(1)
 
     init {
         // The melspectrogram model takes a variable-length input; pin it to our fixed
         // 1760-sample window (480 context + 1280 chunk) so we can feed it without
         // re-resizing on every chunk.
-        melspec.resizeInputTensor(0, intArrayOf(1, MEL_INPUT_SAMPLES), true)
+        melspec.resizeInput(0, intArrayOf(1, MEL_INPUT_SAMPLES), true)
         melspec.allocateTensors()
         embedding.allocateTensors()
         wakeWord.allocateTensors()
+        melOut = FloatArray(melspec.getOutputTensor(0).numElements())
     }
 
     // --- Streaming buffers (mirror openwakeword.utils.AudioPreprocessor) ---
@@ -60,7 +62,6 @@ class OpenWakeWordDetector(
     private var history = ShortArray(0)              // last MEL_CONTEXT samples processed
     private val melFrames = ArrayDeque<FloatArray>() // rolling 76 frames of 32-dim
     private val embWindow = FloatArray(MEL_FRAMES * MEL_BINS)
-    private val embOut = FloatArray(EMBED_DIM)
     private val embeddings = ArrayDeque<FloatArray>() // rolling 120 embeddings of 96-dim
     private val wakeIn = FloatArray(WAKE_FRAMES * EMBED_DIM)
     private var remainder = ShortArray(0)            // < 1280 leftover samples
@@ -97,9 +98,8 @@ class OpenWakeWordDetector(
         val ctx = history.size.coerceAtMost(MEL_CONTEXT)
         for (i in 0 until ctx) melIn[MEL_CONTEXT - ctx + i] = history[history.size - ctx + i].toFloat()
         for (i in chunk.indices) melIn[MEL_CONTEXT + i] = chunk[i].toFloat()
-        melspec.copyInputFromArray(0, melIn)
-        melspec.invoke()
-        val spec = melspec.getOutputArray(0) as FloatArray
+        melspec.run(melIn, melOut)
+        val spec = melOut
         val frames = spec.size / MEL_BINS
         val newFrames = minOf(frames, MEL_FRAMES_PER_CHUNK)
         for (f in (frames - newFrames) until frames) {
@@ -115,9 +115,7 @@ class OpenWakeWordDetector(
                 melFrames[i].copyInto(embWindow, w, 0, MEL_BINS)
                 w += MEL_BINS
             }
-            embedding.copyInputFromArray(0, embWindow)
-            embedding.invoke()
-            (embedding.getOutputArray(0) as FloatArray).copyInto(embOut)
+            embedding.run(embWindow, embOut)
             embeddings.addLast(embOut.copyOf())
         }
         while (embeddings.size > EMB_MAX) embeddings.removeFirst()
@@ -136,9 +134,8 @@ class OpenWakeWordDetector(
             embeddings[i].copyInto(wakeIn, w, 0, EMBED_DIM)
             w += EMBED_DIM
         }
-        wakeWord.copyInputFromArray(0, wakeIn)
-        wakeWord.invoke()
-        return (wakeWord.getOutputArray(0) as FloatArray).firstOrNull() ?: 0f
+        wakeWord.run(wakeIn, wakeOut)
+        return wakeOut.firstOrNull() ?: 0f
     }
 
     private fun takeConfirmation(): Boolean =
