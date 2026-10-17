@@ -3735,7 +3735,7 @@ private fun WakeWordCard(
                     VoiceChoice(
                         value = WakeWordBackend.OPENWAKEWORD.name,
                         label = "openWakeWord (TFLite)",
-                        detail = "Phase 1a: Hey Jarvis",
+                        detail = "Hey Jarvis · Hey Hermes",
                     ),
                 ),
                 onValueChange = { name ->

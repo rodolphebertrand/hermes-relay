@@ -63,19 +63,25 @@ class OpenWakeWordModelInstaller(context: android.content.Context) {
                 staging.mkdirs()
                 download(MEL_FILENAME, MEL_SHA256, MEL_BYTES, staging)
                 download(EMBED_FILENAME, EMBED_SHA256, EMBED_BYTES, staging)
-                download(spec.fileName, spec.sha256, spec.sizeBytes, staging)
+                download(spec.fileName, spec.sha256, spec.sizeBytes, staging, spec.baseUrl ?: BASE_URL)
                 promote(staging)
                 installedFiles(phrase) ?: throw IOException("openWakeWord install failed to verify")
             }
         }
 
-    private fun download(filename: String, sha256: String, expectedBytes: Long, staging: File) {
+    private fun download(
+        filename: String,
+        sha256: String,
+        expectedBytes: Long,
+        staging: File,
+        baseUrl: String = BASE_URL,
+    ) {
         val target = staging.resolve(filename)
         if (target.isFile && sha256Hex(target) == sha256 && target.length() == expectedBytes) {
             return
         }
         target.delete()
-        val url = "$BASE_URL/$filename"
+        val url = "$baseUrl/$filename"
         Log.i(TAG, "downloading $url")
         var conn: HttpURLConnection? = null
         try {

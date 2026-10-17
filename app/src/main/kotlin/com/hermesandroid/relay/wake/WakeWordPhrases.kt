@@ -15,6 +15,13 @@ data class OpenWakeWordModelSpec(
     val fileName: String,
     val sha256: String,
     val sizeBytes: Long,
+    /**
+     * Download base URL (the release prefix the file lives under).
+     * Null → the default openWakeWord v0.5.1 release. Lets third-party models be
+     * served from their own public GitHub release while keeping SHA-256 + size
+     * verification identical.
+     */
+    val baseUrl: String? = null,
 )
 
 /**
@@ -48,6 +55,9 @@ object WakeWordPhrases {
      * Trained openWakeWord classifier models. Phase 1a ships the reference "Hey Jarvis"
      * model (the only pre-trained classifier in the v0.5.1 release that matches a target
      * phrase). Phase 1b trains and registers the other four phrases here.
+     *
+     * "Hey Hermes" is our custom-trained model, served from its own public GitHub release
+     * (baseUrl override); it keeps the exact SHA-256 + size verification of the official flow.
      */
     val OPENWAKEWORD_MODELS: List<OpenWakeWordModelSpec> = listOf(
         OpenWakeWordModelSpec(
@@ -55,6 +65,13 @@ object WakeWordPhrases {
             fileName = "hey_jarvis_v0.1.tflite",
             sha256 = "3080e178d59b2377f5d87180b69b3e63c599795f9b21b05400e203e5c4b01b7f",
             sizeBytes = 1_302_548L,
+        ),
+        OpenWakeWordModelSpec(
+            phrase = "Hey Hermes",
+            fileName = "hey_hermes.tflite",
+            sha256 = "6e01e6fb18be74bf39a20fba72d2977f40ac572c0e4821c24dfe24aba0755009",
+            sizeBytes = 10_519_928L,
+            baseUrl = "https://github.com/rodolphebertrand/hermes-relay/releases/download/wakeword-models-v1",
         ),
     )
 
