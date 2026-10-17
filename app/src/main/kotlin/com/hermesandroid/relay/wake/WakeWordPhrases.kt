@@ -60,18 +60,20 @@ object WakeWordPhrases {
      * (baseUrl override); it keeps the exact SHA-256 + size verification of the official flow.
      */
     val OPENWAKEWORD_MODELS: List<OpenWakeWordModelSpec> = listOf(
-        OpenWakeWordModelSpec(
-            phrase = "Hey Jarvis",
-            fileName = "hey_jarvis_v0.1.tflite",
-            sha256 = "3080e178d59b2377f5d87180b69b3e63c599795f9b21b05400e203e5c4b01b7f",
-            sizeBytes = 1_302_548L,
-        ),
+        // "Hey Hermes" first: it is the custom-trained model and the default
+        // fallback phrase when a stored phrase has no openWakeWord classifier.
         OpenWakeWordModelSpec(
             phrase = "Hey Hermes",
             fileName = "hey_hermes.tflite",
             sha256 = "6e01e6fb18be74bf39a20fba72d2977f40ac572c0e4821c24dfe24aba0755009",
             sizeBytes = 10_519_928L,
             baseUrl = "https://github.com/rodolphebertrand/hermes-relay/releases/download/wakeword-models-v1",
+        ),
+        OpenWakeWordModelSpec(
+            phrase = "Hey Jarvis",
+            fileName = "hey_jarvis_v0.1.tflite",
+            sha256 = "3080e178d59b2377f5d87180b69b3e63c599795f9b21b05400e203e5c4b01b7f",
+            sizeBytes = 1_302_548L,
         ),
     )
 

@@ -3676,7 +3676,7 @@ private fun WakeWordCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.wake_word_enable),
+                    text = stringResource(R.string.wake_word_enable, preferences.phrase),
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(

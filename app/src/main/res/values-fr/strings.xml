@@ -4010,7 +4010,7 @@ Chaque autorisation a sa propre expiration, de sorte qu\'un téléphone peut con
     <string name="conn_info_profile_api_key_cleared">Clé API du profil effacée</string>
     <string name="conn_info_profile_api_key_save_failed">Impossible d\'enregistrer la clé API du profil</string>
     <string name="wake_word_title">Mot de réveil</string>
-    <string name="wake_word_enable">Écouter « Hey Hermes »</string>
+    <string name="wake_word_enable">Écouter « %1$s »</string>
     <string name="wake_word_enable_desc">Détection expérimentale, activable, qui s’exécute entièrement sur ce téléphone.</string>
     <string name="wake_word_phrase">Phrase</string>
     <string name="wake_word_status">État</string>

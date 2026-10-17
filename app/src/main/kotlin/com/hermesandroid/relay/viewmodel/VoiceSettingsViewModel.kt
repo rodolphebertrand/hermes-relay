@@ -186,6 +186,22 @@ class VoiceSettingsViewModel(application: Application) : AndroidViewModel(applic
         viewModelScope.launch { bargeInRepo.setDebugDiagnostics(enabled) }
     }
 
+    /**
+     * If the active backend is openWakeWord but the stored phrase has no trained
+     * classifier (e.g. a legacy sherpa-era phrase like "Hey Luna"), snap the phrase
+     * to the first available openWakeWord one. Without this, enabling dead-ends
+     * with an error and the phrase selector is unreachable (it only renders while
+     * enabled).
+     */
+    private suspend fun resolveWakePhraseIfNeeded() {
+        val prefs = wakeWordRepo.flow.first()
+        if (WakeWordBackend.fromName(prefs.backend) == WakeWordBackend.OPENWAKEWORD &&
+            WakeWordPhrases.openWakeWordSpec(prefs.phrase) == null
+        ) {
+            wakeWordRepo.setPhrase(WakeWordPhrases.OPENWAKEWORD_MODELS.first().phrase)
+        }
+    }
+
     fun setWakeWordEnabled(enabled: Boolean) {
         if (!enabled) {
             viewModelScope.launch { wakeWordRepo.setEnabled(false) }
@@ -196,6 +212,7 @@ class VoiceSettingsViewModel(application: Application) : AndroidViewModel(applic
         if (_wakeWordInstallState.value.installing) return
         _wakeWordInstallState.value = WakeWordInstallUiState(installing = true)
         viewModelScope.launch {
+            resolveWakePhraseIfNeeded()
             val prefs = wakeWordRepo.flow.first()
             val result = WakeWordEngine.ensureModels(getApplication(), prefs)
             result.fold(
@@ -231,6 +248,7 @@ class VoiceSettingsViewModel(application: Application) : AndroidViewModel(applic
         if (_wakeWordInstallState.value.installing) return
         _wakeWordInstallState.value = WakeWordInstallUiState(installing = true)
         viewModelScope.launch {
+            resolveWakePhraseIfNeeded()
             val prefs = wakeWordRepo.flow.first()
             val result = WakeWordEngine.ensureModels(getApplication(), prefs)
             result.fold(
