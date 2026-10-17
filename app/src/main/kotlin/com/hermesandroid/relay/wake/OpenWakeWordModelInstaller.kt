@@ -144,12 +144,12 @@ class OpenWakeWordModelInstaller(context: android.content.Context) {
         // Shared, phrase-independent models (SHA-256 + size from the v0.5.1 release).
         private const val MEL_FILENAME = "melspectrogram.tflite"
         private const val MEL_SHA256 =
-            "93a22705928f35f080560937a71483c498c8d489195b178e43112832248a32d7"
-        private const val MEL_BYTES = 1_147_076L
+            "96fa0adccb6e8cf95cb14465409a1a2898ee4a96a85bb9ed3c7eb0e68bf163e8"
+        private const val MEL_BYTES = 1_092_516L
 
         private const val EMBED_FILENAME = "embedding_model.tflite"
         private const val EMBED_SHA256 =
-            "c0915d701d92f6f32651d5621100d712240e60d76a8a2c14610f15841b01d130"
-        private const val EMBED_BYTES = 1_302_492L
+            "c0aea21eb84a4ce90a08c870da41b7a7173b45269e6a3207c71d67c40f3a59d8"
+        private const val EMBED_BYTES = 1_330_312L
     }
 }

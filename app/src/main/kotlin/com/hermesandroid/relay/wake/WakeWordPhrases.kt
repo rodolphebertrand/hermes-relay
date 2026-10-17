@@ -72,8 +72,8 @@ object WakeWordPhrases {
         OpenWakeWordModelSpec(
             phrase = "Hey Jarvis",
             fileName = "hey_jarvis_v0.1.tflite",
-            sha256 = "3080e178d59b2377f5d87180b69b3e63c599795f9b21b05400e203e5c4b01b7f",
-            sizeBytes = 1_302_548L,
+            sha256 = "14bff778604985e1b5c19f0f7bbe477a69cf281d8db34b232b3b972411f710e2",
+            sizeBytes = 1_278_912L,
         ),
     )
 
