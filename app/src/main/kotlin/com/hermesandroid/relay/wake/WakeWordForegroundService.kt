@@ -159,7 +159,7 @@ class WakeWordForegroundService : Service() {
             var testDetection = false
             var unattachedDetector: WakeWordDetector? = null
             try {
-                val createdDetector = WakeWordEngine.createDetector(this, preferences)
+                val createdDetector = WakeWordEngine.createDetector(this@WakeWordForegroundService, preferences)
                     ?: run {
                         fail("Wake-word model is not installed for the selected backend/phrase")
                         return@launch

@@ -171,7 +171,7 @@ class HermesVoiceInteractionService : VoiceInteractionService() {
             var detected = false
             var unattachedDetector: WakeWordDetector? = null
             try {
-                val createdDetector = WakeWordEngine.createDetector(this, preferences)
+                val createdDetector = WakeWordEngine.createDetector(this@HermesVoiceInteractionService, preferences)
                     ?: run {
                         setRuntimeState(AssistantWakeRuntimeState.Error)
                         return@launch
