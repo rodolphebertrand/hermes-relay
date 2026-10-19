@@ -148,7 +148,7 @@ class OpenWakeWordModelInstaller(context: android.content.Context) {
         // would silently re-promote the OLD model under the NEW url's meta.
         val stagingMeta = staging.resolve(CUSTOM_META_FILENAME)
         val stagingMetaUrl = if (stagingMeta.isFile) stagingMeta.readText().lineSequence()
-            .firstOrNull { it.startsWith(\"url=\") }?.removePrefix(\"url=\") else null
+            .firstOrNull { it.startsWith("url=") }?.removePrefix("url=") else null
         if (target.isFile && target.length() >= MIN_CUSTOM_BYTES && stagingMetaUrl == url &&
             (expectedSha == null || sha256Hex(target) == expectedSha)
         ) {
