@@ -107,17 +107,20 @@ class OpenWakeWordModelInstaller(context: android.content.Context) {
                 val cleanUrl = url.trim()
                 require(cleanUrl.isNotEmpty()) { "custom model URL is empty" }
                 val expected = sha256?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+                require(expected == null || (expected.length == 64 && expected.all { it.isDigit() || it in 'a'..'f' })) {
+                    "SHA-256 invalide : ${expected?.length} caractères (attendu 64 hex)"
+                }
                 installedCustomFiles(cleanUrl, expected)?.let { return@runCatching it }
                 val staging = prepareStaging()
                 download(MEL_FILENAME, MEL_SHA256, MEL_BYTES, staging)
                 download(EMBED_FILENAME, EMBED_SHA256, EMBED_BYTES, staging)
-                downloadCustom(cleanUrl, expected, staging)
                 staging.resolve(CUSTOM_META_FILENAME).writeText(
                     buildString {
                         appendLine("url=$cleanUrl")
                         if (expected != null) appendLine("sha256=$expected")
                     },
                 )
+                downloadCustom(cleanUrl, expected, staging)
                 promote(staging)
                 installedCustomFiles(cleanUrl, expected)
                     ?: throw IOException("custom wake model install failed verification")
@@ -139,8 +142,14 @@ class OpenWakeWordModelInstaller(context: android.content.Context) {
 
     private fun downloadCustom(url: String, expectedSha: String?, staging: File) {
         val target = staging.resolve(CUSTOM_FILENAME)
-        // Reuse a cached copy when it already satisfies the (optional) checksum.
-        if (target.isFile && target.length() >= MIN_CUSTOM_BYTES &&
+        // Reuse a cached copy only when it was downloaded for the SAME url:
+        // prepareStaging() copies the previously-installed custom model into the
+        // staging area, and without this url check an url change without a sha
+        // would silently re-promote the OLD model under the NEW url's meta.
+        val stagingMeta = staging.resolve(CUSTOM_META_FILENAME)
+        val stagingMetaUrl = if (stagingMeta.isFile) stagingMeta.readText().lineSequence()
+            .firstOrNull { it.startsWith(\"url=\") }?.removePrefix(\"url=\") else null
+        if (target.isFile && target.length() >= MIN_CUSTOM_BYTES && stagingMetaUrl == url &&
             (expectedSha == null || sha256Hex(target) == expectedSha)
         ) {
             return
