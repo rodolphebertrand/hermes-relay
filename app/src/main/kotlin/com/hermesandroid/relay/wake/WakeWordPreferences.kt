@@ -46,6 +46,17 @@ data class WakeWordPreferences(
     val confirmationFrames: Int = 3,
     val startNewSession: Boolean = true,
     val profileRouting: WakeWordProfileRouting = WakeWordProfileRouting(),
+    /**
+     * Optional full HTTP(S) URL of a custom TFLite wake-word classifier
+     * (openWakeWord backend only), e.g. a model hosted on the user's own LAN
+     * server. When set and non-blank, it takes precedence over [phrase].
+     */
+    val customModelUrl: String? = null,
+    /**
+     * Optional SHA-256 (hex) of the custom model, used to verify the download
+     * and to decide whether a cached copy is still valid. Null = no checksum.
+     */
+    val customModelSha256: String? = null,
 )
 
 internal enum class WakeWordListenerMode {
@@ -85,6 +96,8 @@ class WakeWordPreferencesRepository(
         val KEY_START_NEW_SESSION = booleanPreferencesKey("wake_word_start_new_session")
         val KEY_PROFILE_ROUTE_MODE = stringPreferencesKey("wake_word_profile_route_mode")
         val KEY_PROFILE_NAME = stringPreferencesKey("wake_word_profile_name")
+        val KEY_CUSTOM_MODEL_URL = stringPreferencesKey("wake_word_custom_model_url")
+        val KEY_CUSTOM_MODEL_SHA256 = stringPreferencesKey("wake_word_custom_model_sha256")
     }
 
     val flow: Flow<WakeWordPreferences> = dataStore.data
@@ -109,6 +122,13 @@ class WakeWordPreferencesRepository(
                         ?.trim()
                         ?.takeIf { it.isNotEmpty() },
                 ),
+                customModelUrl = prefs[KEY_CUSTOM_MODEL_URL]
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() },
+                customModelSha256 = prefs[KEY_CUSTOM_MODEL_SHA256]
+                    ?.trim()
+                    ?.lowercase()
+                    ?.takeIf { it.isNotEmpty() },
             )
         }
         .distinctUntilChanged()
@@ -158,6 +178,28 @@ class WakeWordPreferencesRepository(
 
     suspend fun setStartNewSession(enabled: Boolean) {
         dataStore.edit { it[KEY_START_NEW_SESSION] = enabled }
+    }
+
+    /**
+     * Store the custom wake-word classifier (openWakeWord backend): full model URL
+     * and optional SHA-256. Blank values clear the corresponding setting, so
+     * clearing the URL field restores the built-in phrase models.
+     */
+    suspend fun setCustomModel(url: String?, sha256: String?) {
+        dataStore.edit { prefs ->
+            val cleanUrl = url?.trim()?.takeIf { it.isNotEmpty() }
+            if (cleanUrl == null) {
+                prefs.remove(KEY_CUSTOM_MODEL_URL)
+            } else {
+                prefs[KEY_CUSTOM_MODEL_URL] = cleanUrl
+            }
+            val cleanSha = sha256?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+            if (cleanSha == null) {
+                prefs.remove(KEY_CUSTOM_MODEL_SHA256)
+            } else {
+                prefs[KEY_CUSTOM_MODEL_SHA256] = cleanSha
+            }
+        }
     }
 
     /**

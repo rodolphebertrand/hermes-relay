@@ -20,16 +20,27 @@ object WakeWordEngine {
      * Creates a [WakeWordDetector] for the configured backend + phrase, or null when
      * the required model set is not installed (e.g. the phrase has no trained
      * openWakeWord classifier yet, or the sherpa models are missing).
+     *
+     * For openWakeWord, a configured custom model URL takes precedence over the
+     * built-in phrase models.
      */
     fun createDetector(context: Context, prefs: WakeWordPreferences): WakeWordDetector? {
         return if (isOpenWakeWord(prefs)) {
-            val files = OpenWakeWordModelInstaller(context).installedFiles(prefs.phrase)
-                ?: return null
+            val installer = OpenWakeWordModelInstaller(context)
+            val files = if (prefs.customModelUrl?.isNotBlank() == true) {
+                installer.installedCustomFiles(prefs.customModelUrl, prefs.customModelSha256)
+            } else {
+                installer.installedFiles(prefs.phrase)
+            } ?: return null
             OpenWakeWordDetector(
                 files = files,
                 sensitivity = prefs.sensitivity,
                 confirmationFrames = prefs.confirmationFrames,
                 phrase = prefs.phrase,
+                // Melspectrogram is computed in pure Kotlin (bundled weights) — the
+                // TFLite melspectrogram model crashes on the S21 FE (wrong output
+                // shape from the ARM runtime).
+                mel = MelSpectrogram.fromAsset(context),
             )
         } else {
             val files = WakeWordModelInstaller(context).installedFiles() ?: return null
@@ -46,10 +57,18 @@ object WakeWordEngine {
      * Ensures the model set for the configured backend + phrase is installed.
      * The success value is the verified files (concrete type depends on backend);
      * the caller folds [Result] and ignores the value on success.
+     *
+     * For openWakeWord, a configured custom model URL is installed from that URL
+     * instead of the built-in phrase model.
      */
     suspend fun ensureModels(context: Context, prefs: WakeWordPreferences): Result<*> {
         return if (isOpenWakeWord(prefs)) {
-            OpenWakeWordModelInstaller(context).ensureInstalled(prefs.phrase)
+            val installer = OpenWakeWordModelInstaller(context)
+            if (prefs.customModelUrl?.isNotBlank() == true) {
+                installer.ensureCustomInstalled(prefs.customModelUrl, prefs.customModelSha256)
+            } else {
+                installer.ensureInstalled(prefs.phrase)
+            }
         } else {
             WakeWordModelInstaller(context).ensureInstalled()
         }

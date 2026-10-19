@@ -195,6 +195,8 @@ class VoiceSettingsViewModel(application: Application) : AndroidViewModel(applic
      */
     private suspend fun resolveWakePhraseIfNeeded() {
         val prefs = wakeWordRepo.flow.first()
+        // A custom model URL doesn't depend on a trained phrase; leave the phrase as-is.
+        if (prefs.customModelUrl?.isNotBlank() == true) return
         if (WakeWordBackend.fromName(prefs.backend) == WakeWordBackend.OPENWAKEWORD &&
             WakeWordPhrases.openWakeWordSpec(prefs.phrase) == null
         ) {
@@ -291,11 +293,46 @@ class VoiceSettingsViewModel(application: Application) : AndroidViewModel(applic
         viewModelScope.launch {
             wakeWordRepo.setBackend(backend)
             val prefs = wakeWordRepo.flow.first()
+            // A custom model URL doesn't need a trained phrase; skip the snap.
+            if (prefs.customModelUrl?.isNotBlank() == true) {
+                WakeWordForegroundService.reloadSettings()
+                return@launch
+            }
             if (backend == WakeWordBackend.OPENWAKEWORD &&
                 WakeWordPhrases.openWakeWordSpec(prefs.phrase) == null
             ) {
                 val fallback = WakeWordPhrases.OPENWAKEWORD_MODELS.first().phrase
                 wakeWordRepo.setPhrase(fallback)
+            }
+            WakeWordForegroundService.reloadSettings()
+        }
+    }
+
+    /**
+     * Store the custom wake-word classifier (openWakeWord backend): full model URL
+     * plus optional SHA-256. Blank/empty values clear the setting and restore the
+     * built-in phrase models on the next (re)start of the listener.
+     */
+    fun setWakeWordCustomModel(url: String?, sha256: String?) {
+        viewModelScope.launch {
+            wakeWordRepo.setCustomModel(url, sha256)
+            val prefs = wakeWordRepo.flow.first()
+            // "Appliquer" must actually download + verify the custom model. The old
+            // save-then-reload flow restarted the listener against a model that was
+            // never fetched, dead-ending in "À vérifier" (model not installed) — the
+            // download only happened if the user re-toggled the enable switch.
+            if (prefs.customModelUrl?.isNotBlank() == true) {
+                if (_wakeWordInstallState.value.installing) return@launch
+                _wakeWordInstallState.value = WakeWordInstallUiState(installing = true)
+                val result = WakeWordEngine.ensureModels(getApplication(), prefs)
+                _wakeWordInstallState.value = result.fold(
+                    onSuccess = { WakeWordInstallUiState() },
+                    onFailure = { error ->
+                        WakeWordInstallUiState(
+                            error = error.message ?: "Could not install the custom wake model",
+                        )
+                    },
+                )
             }
             WakeWordForegroundService.reloadSettings()
         }

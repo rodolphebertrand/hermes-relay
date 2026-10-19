@@ -623,6 +623,7 @@ fun VoiceSettingsScreen(
                         onStartNewSessionChange =
                             settingsViewModel::setWakeWordStartNewSession,
                         onTest = settingsViewModel::testWakeWord,
+                        onCustomModelChange = settingsViewModel::setWakeWordCustomModel,
                     )
                     BargeInCard(
                         bargeInPrefs = bargeInPrefs,
@@ -3653,6 +3654,7 @@ private fun WakeWordCard(
     onBackendChange: (WakeWordBackend) -> Unit,
     onSensitivityChange: (Float) -> Unit,
     onConfirmationFramesChange: (Int) -> Unit,
+    onCustomModelChange: (String?, String?) -> Unit,
     onStartNewSessionChange: (Boolean) -> Unit,
     onTest: () -> Unit,
 ) {
@@ -3758,6 +3760,82 @@ private fun WakeWordCard(
                 onValueChange = onPhraseChange,
             )
             Spacer(Modifier.height(8.dp))
+            if (isOpenWakeWord) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Text(
+                    text = "Modèle personnalisé (openWakeWord)",
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Text(
+                    text = "Optionnel : URL HTTP(S) d'un modèle .tflite entraîné sur votre voix " +
+                        "(ex. hébergé sur votre LAN). Il remplace le modèle intégré de la phrase ci-dessus.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                var customUrlDraft by remember(preferences.customModelUrl) {
+                    mutableStateOf(preferences.customModelUrl.orEmpty())
+                }
+                var customShaDraft by remember(preferences.customModelSha256) {
+                    mutableStateOf(preferences.customModelSha256.orEmpty())
+                }
+                OutlinedTextField(
+                    value = customUrlDraft,
+                    onValueChange = { customUrlDraft = it },
+                    label = { Text("URL du modèle (http://…)") },
+                    placeholder = { Text("http://192.168.2.142:8471/hey_hermes_v2.tflite") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = customShaDraft,
+                    onValueChange = { customShaDraft = it },
+                    label = { Text("SHA-256 du modèle (optionnel)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilledTonalButton(
+                        onClick = { onCustomModelChange(customUrlDraft, customShaDraft) },
+                        enabled = customUrlDraft.isNotBlank(),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            if (preferences.customModelUrl?.isNotBlank() == true) {
+                                "Remplacer le modèle"
+                            } else {
+                                "Appliquer"
+                            },
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            customUrlDraft = ""
+                            customShaDraft = ""
+                            onCustomModelChange(null, null)
+                        },
+                        enabled = preferences.customModelUrl?.isNotBlank() == true,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Effacer")
+                    }
+                }
+                if (preferences.customModelUrl?.isNotBlank() == true) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "Modèle personnalisé actif : ${preferences.customModelUrl}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             ProviderRow(
                 label = stringResource(R.string.wake_word_status),
                 value = when (runtimeState) {

@@ -49,6 +49,34 @@ class OpenWakeWordModelInstaller(context: android.content.Context) {
     }
 
     /**
+     * Resolves a previously installed custom classifier (see [ensureCustomInstalled])
+     * for the exact [url], or null when anything is missing/corrupt or the cached
+     * model was downloaded from a different URL.
+     */
+    fun installedCustomFiles(url: String, sha256: String?): OpenWakeWordModelFiles? {
+        val cleanUrl = url.trim()
+        if (cleanUrl.isEmpty()) return null
+        val mel = dir.resolve(MEL_FILENAME)
+        val emb = dir.resolve(EMBED_FILENAME)
+        val wak = dir.resolve(CUSTOM_FILENAME)
+        if (!mel.isFile || !emb.isFile || !wak.isFile) return null
+        if (mel.length() != MEL_BYTES || emb.length() != EMBED_BYTES) return null
+        if (sha256Hex(mel) != MEL_SHA256 || sha256Hex(emb) != EMBED_SHA256) return null
+        if (wak.length() < MIN_CUSTOM_BYTES) return null
+        val expected = sha256?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+        if (expected != null && sha256Hex(wak) != expected) return null
+        // The meta file records which URL produced this classifier, so switching
+        // URLs always forces a fresh download instead of reusing the wrong model.
+        val meta = dir.resolve(CUSTOM_META_FILENAME)
+        if (!meta.isFile) return null
+        val metaUrl = meta.readText().lineSequence()
+            .firstOrNull { it.startsWith("url=") }
+            ?.removePrefix("url=")
+        if (metaUrl != cleanUrl) return null
+        return OpenWakeWordModelFiles(mel, emb, wak, dir)
+    }
+
+    /**
      * Downloads + verifies the model set for [phrase] (on the IO dispatcher).
      * Returns [Ok] with the verified files, or [failure] with a reason.
      */
@@ -58,9 +86,7 @@ class OpenWakeWordModelInstaller(context: android.content.Context) {
                 installedFiles(phrase)?.let { return@runCatching it }
                 val spec = WakeWordPhrases.openWakeWordSpec(phrase)
                     ?: throw IOException("No openWakeWord model trained for phrase '$phrase' yet")
-                val staging = dir.resolveSibling(DIR_NAME + ".tmp")
-                if (staging.exists()) staging.deleteRecursively()
-                staging.mkdirs()
+                val staging = prepareStaging()
                 download(MEL_FILENAME, MEL_SHA256, MEL_BYTES, staging)
                 download(EMBED_FILENAME, EMBED_SHA256, EMBED_BYTES, staging)
                 download(spec.fileName, spec.sha256, spec.sizeBytes, staging, spec.baseUrl ?: BASE_URL)
@@ -68,6 +94,92 @@ class OpenWakeWordModelInstaller(context: android.content.Context) {
                 installedFiles(phrase) ?: throw IOException("openWakeWord install failed to verify")
             }
         }
+
+    /**
+     * Downloads + verifies a custom classifier from a full [url] (any HTTP(S) server,
+     * e.g. a private LAN host) plus the shared melspectrogram/embedding models, then
+     * atomically promotes the set. [sha256] (optional) is used to verify the download;
+     * without it, a minimum-size sanity check guards against error pages.
+     */
+    suspend fun ensureCustomInstalled(url: String, sha256: String?): Result<OpenWakeWordModelFiles> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val cleanUrl = url.trim()
+                require(cleanUrl.isNotEmpty()) { "custom model URL is empty" }
+                val expected = sha256?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+                installedCustomFiles(cleanUrl, expected)?.let { return@runCatching it }
+                val staging = prepareStaging()
+                download(MEL_FILENAME, MEL_SHA256, MEL_BYTES, staging)
+                download(EMBED_FILENAME, EMBED_SHA256, EMBED_BYTES, staging)
+                downloadCustom(cleanUrl, expected, staging)
+                staging.resolve(CUSTOM_META_FILENAME).writeText(
+                    buildString {
+                        appendLine("url=$cleanUrl")
+                        if (expected != null) appendLine("sha256=$expected")
+                    },
+                )
+                promote(staging)
+                installedCustomFiles(cleanUrl, expected)
+                    ?: throw IOException("custom wake model install failed verification")
+            }
+        }
+
+    /**
+     * Fresh staging area that preserves whatever is already installed (other phrase
+     * classifiers, a previous custom model, the verified marker) so [promote] never
+     * wipes out models that are still in use.
+     */
+    private fun prepareStaging(): File {
+        val staging = dir.resolveSibling(DIR_NAME + ".tmp")
+        if (staging.exists()) staging.deleteRecursively()
+        staging.mkdirs()
+        if (dir.exists()) dir.copyRecursively(staging, overwrite = true)
+        return staging
+    }
+
+    private fun downloadCustom(url: String, expectedSha: String?, staging: File) {
+        val target = staging.resolve(CUSTOM_FILENAME)
+        // Reuse a cached copy when it already satisfies the (optional) checksum.
+        if (target.isFile && target.length() >= MIN_CUSTOM_BYTES &&
+            (expectedSha == null || sha256Hex(target) == expectedSha)
+        ) {
+            return
+        }
+        target.delete()
+        Log.i(TAG, "downloading custom wake model from $url")
+        var conn: HttpURLConnection? = null
+        try {
+            conn = URL(url).openConnection() as HttpURLConnection
+            conn.connectTimeout = 20_000
+            conn.readTimeout = 120_000
+            if (conn.responseCode != HttpURLConnection.HTTP_OK) {
+                throw IOException("HTTP ${conn.responseCode} for custom model URL")
+            }
+            val inStream = BufferedInputStream(conn.inputStream)
+            val outStream = BufferedOutputStream(FileOutputStream(target))
+            val buf = ByteArray(64 * 1024)
+            var n = inStream.read(buf)
+            while (n >= 0) {
+                outStream.write(buf, 0, n)
+                n = inStream.read(buf)
+            }
+            outStream.flush()
+            inStream.close()
+            outStream.close()
+        } finally {
+            conn?.disconnect()
+        }
+        if (target.length() < MIN_CUSTOM_BYTES) {
+            target.delete()
+            throw IOException(
+                "custom model too small (${target.length()} bytes) — likely an error page, not a model",
+            )
+        }
+        if (expectedSha != null && sha256Hex(target) != expectedSha) {
+            target.delete()
+            throw IOException("SHA-256 mismatch for custom wake model")
+        }
+    }
 
     private fun download(
         filename: String,
@@ -151,5 +263,11 @@ class OpenWakeWordModelInstaller(context: android.content.Context) {
         private const val EMBED_SHA256 =
             "c0aea21eb84a4ce90a08c870da41b7a7173b45269e6a3207c71d67c40f3a59d8"
         private const val EMBED_BYTES = 1_330_312L
+
+        // Custom classifier (user-supplied URL): filename is fixed, size is not
+        // known in advance — a minimum-size floor catches HTML error pages.
+        const val CUSTOM_FILENAME = "custom_wakeword.tflite"
+        const val CUSTOM_META_FILENAME = "custom_wakeword.meta"
+        const val MIN_CUSTOM_BYTES = 100_000L
     }
 }
