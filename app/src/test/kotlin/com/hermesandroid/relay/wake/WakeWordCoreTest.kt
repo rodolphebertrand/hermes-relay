@@ -91,6 +91,20 @@ class WakeWordCoreTest {
     }
 
     @Test
+    fun openWakeWordThreshold_higherMeansStricterAndClamps() {
+        // Regression guard: the UI promises "higher values are stricter", but
+        // thresholdFor used to INVERT this (0.9 -> 0.3 threshold). Monotonic check:
+        assertTrue(
+            OpenWakeWordDetector.thresholdFor(0.9f) > OpenWakeWordDetector.thresholdFor(0.3f),
+        )
+        // Historical default preserved: sensitivity 0.3 -> 0.6 threshold.
+        assertEquals(0.6f, OpenWakeWordDetector.thresholdFor(0.3f))
+        // Clamps: min sensitivity 0.2 -> 0.5, max 0.9 -> 0.95.
+        assertEquals(0.5f, OpenWakeWordDetector.thresholdFor(0.2f))
+        assertEquals(0.95f, OpenWakeWordDetector.thresholdFor(0.9f))
+    }
+
+    @Test
     fun inputLevel_reportsPeakAndHandlesEmptyFrames() {
         assertEquals(0f, wakeWordInputLevel(shortArrayOf(), 0))
         assertEquals(0.5f, wakeWordInputLevel(shortArrayOf(0, 16_384, -4_000), 3))

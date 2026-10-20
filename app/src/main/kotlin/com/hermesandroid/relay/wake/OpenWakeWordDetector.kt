@@ -294,10 +294,13 @@ class OpenWakeWordDetector(
 
         /**
          * Maps the app `sensitivity` (0.2..0.9, higher = stricter) to a score threshold.
-         * Default sensitivity 0.3 -> threshold 0.6; max sensitivity 0.9 -> 0.3.
+         * Monotonic increasing: higher sensitivity -> higher threshold -> stricter,
+         * matching the UI description ("higher values are stricter"). Default
+         * sensitivity 0.3 -> threshold 0.6 (unchanged historical default);
+         * max sensitivity 0.9 -> threshold 0.95; min 0.2 -> 0.5.
          * (openWakeWord's own default is 0.5; we expose it through the existing UI knob.)
          */
         fun thresholdFor(sensitivity: Float): Float =
-            (0.9f - sensitivity).coerceIn(0.1f, 0.9f)
+            (0.6f + (sensitivity - 0.3f)).coerceIn(0.5f, 0.95f)
     }
 }
