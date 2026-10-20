@@ -105,6 +105,33 @@ class WakeWordCoreTest {
     }
 
     @Test
+    fun openWakeWordConfirmation_requiresConsecutiveNotAccumulated() {
+        // Regression guard: the confirmation counter used to never reset on
+        // below-threshold scores, so scattered TV blips accumulated into a
+        // "spontaneous" wake. 5 blips with misses in between must NOT fire.
+        var hits = 0; var detected = false
+        val pattern = listOf(0.99f, 0.01f, 0.99f, 0.01f, 0.99f, 0.01f, 0.99f, 0.01f, 0.99f)
+        for (s in pattern) {
+            val r = OpenWakeWordDetector.updateStreak(hits, 5, s, 0.8f)
+            hits = r.first; detected = detected || r.second
+        }
+        assertFalse("scattered TV blips must not accumulate into a wake", detected)
+
+        // 5 consecutive high scores DO fire, and the streak resets after firing.
+        hits = 0; detected = false
+        repeat(5) {
+            val r = OpenWakeWordDetector.updateStreak(hits, 5, 0.99f, 0.8f)
+            hits = r.first; detected = detected || r.second
+        }
+        assertTrue(detected)
+        assertEquals(0, hits)
+        // A miss after a partial streak resets it.
+        val r = OpenWakeWordDetector.updateStreak(4, 5, 0.5f, 0.8f)
+        assertEquals(0, r.first)
+        assertFalse(r.second)
+    }
+
+    @Test
     fun inputLevel_reportsPeakAndHandlesEmptyFrames() {
         assertEquals(0f, wakeWordInputLevel(shortArrayOf(), 0))
         assertEquals(0.5f, wakeWordInputLevel(shortArrayOf(0, 16_384, -4_000), 3))

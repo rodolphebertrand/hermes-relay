@@ -190,7 +190,7 @@ class OpenWakeWordDetector(
             scoreLogChunks = 0
             Log.i(TAG, "wake score=$score threshold=$threshold emb=${embeddings.size}")
         }
-        return score >= threshold && takeConfirmation()
+        return registerScore(score)
     }
 
     private fun processChunk(chunk: ShortArray) {
@@ -263,13 +263,19 @@ class OpenWakeWordDetector(
         }
     }
 
-    private fun takeConfirmation(): Boolean =
-        if (++confirmHits >= confirmationsNeeded) {
-            confirmHits = 0
-            true
-        } else {
-            false
-        }
+    /**
+     * Confirmation counter. A detection fires when `confirmationFrames`
+     * CONSECUTIVE evaluations score >= threshold; a single below-threshold
+     * evaluation resets the streak. Previously the counter only ever
+     * incremented (no reset on misses), so scattered above-threshold blips
+     * from background TV speech accumulated over minutes and fired a wake
+     * long after the last high score — "spontaneous" false positives.
+     */
+    private fun registerScore(score: Float): Boolean {
+        val (hits, detected) = updateStreak(confirmHits, confirmationsNeeded, score, threshold)
+        confirmHits = hits
+        return detected
+    }
 
     override fun close() {
         if (closed) return
@@ -291,6 +297,21 @@ class OpenWakeWordDetector(
         /** Frames produced by the fixed 1760-sample melspectrogram window: (1760-512)/160 + 1. */
         private const val MAX_MEL_FRAMES = (MEL_INPUT_SAMPLES - 512) / 160 + 1 // = 8
         private const val EMB_MAX = 120                         // rolling embedding buffer (~10 s)
+
+        /**
+         * Pure streak-update for the confirmation counter: a detection fires
+         * after [needed] CONSECUTIVE scores >= [threshold]; one below-threshold
+         * score resets the streak to zero. Returns (newHits, detected).
+         * Regression-guarded by WakeWordCoreTest: scattered above-threshold
+         * blips (background TV) must NOT accumulate into a wake.
+         */
+        fun updateStreak(hits: Int, needed: Int, score: Float, threshold: Float): Pair<Int, Boolean> {
+            if (score >= threshold) {
+                val h = hits + 1
+                return if (h >= needed) 0 to true else h to false
+            }
+            return 0 to false
+        }
 
         /**
          * Maps the app `sensitivity` (0.2..0.9, higher = stricter) to a score threshold.
